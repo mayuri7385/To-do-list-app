@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Modern Todo App</title>
+
+<style>
+:root {
+  --bg:#f7f7fb;
+  --card:#ffffff;
+  --text:#1f2937;
+  --muted:#6b7280;
+  --border:#e5e7eb;
+  --primary:#6366f1;
+}
+
+.dark {
+  --bg:#0f172a;
+  --card:#1e293b;
+  --text:#f1f5f9;
+  --muted:#94a3b8;
+  --border:#334155;
+}
+
+body {
+  margin:0;
+  font-family:system-ui;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.container {
+  max-width:600px;
+  margin:auto;
+  padding:30px 15px;
+}
+
+.card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:20px;
+}
+
+button {
+  cursor:pointer;
+}
+
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.title {
+  font-size:26px;
+  font-weight:700;
+}
+
+.progress-bar {
+  height:8px;
+  background:#ddd;
+  border-radius:20px;
+  margin-top:10px;
+  overflow:hidden;
+}
+
+.progress-fill {
+  height:100%;
+  background:var(--primary);
+  width:0%;
+}
+
+input, select {
+  padding:10px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--card);
+  color:var(--text);
+}
+
+.todo-input-row {
+  display:flex;
+  gap:10px;
+  margin-top:15px;
+}
+
+.todo-input-row input {
+  flex:1;
+}
+
+.add-btn {
+  background:var(--primary);
+  color:white;
+  border:none;
+  padding:10px 18px;
+  border-radius:10px;
+}
+
+.controls {
+  display:flex;
+  justify-content:space-between;
+  margin-top:15px;
+}
+
+.todo {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px;
+  border-bottom:1px solid var(--border);
+}
+
+.todo:last-child {
+  border:none;
+}
+
+.priority {
+  font-size:12px;
+  padding:3px 8px;
+  border-radius:8px;
+  color:white;
+}
+
+.high {background:#ef4444;}
+.medium {background:#f59e0b;}
+.low {background:#10b981;}
+.none {background:#6b7280;}
+
+.filters button {
+  border:none;
+  padding:6px 12px;
+  margin-right:5px;
+  border-radius:8px;
+}
+
+.active-filter {
+  background:var(--primary);
+  color:white;
+}
+
+.search {
+  width:100%;
+  margin-top:10px;
+}
+
+.footer {
+  text-align:center;
+  margin-top:10px;
+  color:var(--muted);
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+<div>
+<div class="title">My Tasks</div>
+<div id="stats"></div>
+</div>
+
+<button onclick="toggleTheme()">🌙</button>
+</div>
+
+<div class="progress-bar">
+<div class="progress-fill" id="progress"></div>
+</div>
+
+<input
+class="search"
+placeholder="Search tasks..."
+oninput="updateSearch(this.value)"
+/>
+
+<div class="card">
+
+<div class="todo-input-row">
+<input id="taskInput" placeholder="Add new task"/>
+<select id="prioritySelect">
+<option value="none">Priority</option>
+<option value="high">High</option>
+<option value="medium">Medium</option>
+<option value="low">Low</option>
+</select>
+
+<input type="date" id="dueDate"/>
+
+<button class="add-btn" onclick="addTodo()">Add</button>
+</div>
+
+<div class="controls">
+
+<div class="filters">
+<button onclick="setFilter('all')" id="f-all">All</button>
+<button onclick="setFilter('active')" id="f-active">Active</button>
+<button onclick="setFilter('completed')" id="f-completed">Done</button>
+</div>
+
+<button onclick="clearCompleted()">Clear Done</button>
+
+</div>
+
+<div id="todoList"></div>
+
+</div>
+
+<div class="footer" id="footer"></div>
+
+</div>
+
+<script>
+
+const STORAGE="todos-modern";
+
+let todos=JSON.parse(localStorage.getItem(STORAGE))||[];
+
+let filter="all";
+let search="";
+
+function save(){
+localStorage.setItem(STORAGE,JSON.stringify(todos));
+render();
+}
+
+function addTodo(){
+const text=document.getElementById("taskInput").value.trim();
+if(!text) return;
+
+todos.unshift({
+id:Date.now(),
+text,
+completed:false,
+priority:document.getElementById("prioritySelect").value,
+dueDate:document.getElementById("dueDate").value
+});
+
+document.getElementById("taskInput").value="";
+save();
+}
+
+function toggleTodo(id){
+todos=todos.map(t=>t.id===id?{...t,completed:!t.completed}:t);
+save();
+}
+
+function deleteTodo(id){
+todos=todos.filter(t=>t.id!==id);
+save();
+}
+
+function clearCompleted(){
+todos=todos.filter(t=>!t.completed);
+save();
+}
+
+function setFilter(type){
+filter=type;
+render();
+}
+
+function updateSearch(val){
+search=val.toLowerCase();
+render();
+}
+
+function toggleTheme(){
+document.body.classList.toggle("dark");
+}
+
+function render(){
+
+const list=document.getElementById("todoList");
+
+let filtered=todos
+.filter(t=>{
+if(filter==="active") return !t.completed;
+if(filter==="completed") return t.completed;
+return true;
+})
+.filter(t=>t.text.toLowerCase().includes(search));
+
+list.innerHTML="";
+
+filtered.forEach(todo=>{
+
+const el=document.createElement("div");
+
+el.className="todo";
+
+el.innerHTML=`
+<div>
+<input type="checkbox"
+${todo.completed?"checked":""}
+onclick="toggleTodo(${todo.id})"/>
+
+${todo.text}
+
+${todo.priority!=="none"
+? `<span class="priority ${todo.priority}">
+${todo.priority}
+</span>`:""}
+
+${todo.dueDate
+? `<small> 📅 ${todo.dueDate}</small>`:""}
+</div>
+
+<button onclick="deleteTodo(${todo.id})">❌</button>
+`;
+
+list.appendChild(el);
+
+});
+
+const remaining=todos.filter(t=>!t.completed).length;
+const completed=todos.filter(t=>t.completed).length;
+
+document.getElementById("stats").innerText=
+`${remaining} remaining · ${completed} done`;
+
+const progress=
+todos.length
+?Math.round((completed/todos.length)*100)
+:0;
+
+document.getElementById("progress").style.width=
+progress+"%";
+
+document.getElementById("footer").innerText=
+`${todos.length} total tasks · saved locally`;
+}
+
+render();
+
+</script>
+
+</body>
+</html>
